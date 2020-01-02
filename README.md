@@ -12,7 +12,7 @@ a. University Data
 
 b. City Data
 
-3. Association Rules Mining
+3. Association Rule Mining
 
 a. Groceries Data
 
