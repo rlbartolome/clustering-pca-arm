@@ -1,0 +1,45 @@
+---
+title: "Principal Component Analysis"
+author: "Rommel Bartolome"
+date: "March 15, 2019"
+output: pdf_document
+---
+
+## Data Loading
+First, we set the city names as row names and remove it from the dataset that we will use in the analysis:
+```{r}
+cities <- read.csv("cities.csv")
+rownames(cities) <- cities[,1]
+cities[,1] <- NULL
+```
+
+## 1) How many principal components can adequately explain the variation in the data? Justify your choice.
+
+We first check principal components of each:
+
+```{r}
+pr.cities <- prcomp(cities, scale = T)
+pr.cities$rotation
+```
+
+We check the screeplot:
+
+```{r}
+screeplot(pr.cities, type = 'l')
+```
+
+In the screeplot, we can see that 2 is an adequate number of principal components to explain the variation in the data (elbow).
+
+## 2) Interpret the principal components that you have chosen: basically, describe the characteristics contained in those PCs.
+
+From `pr.cities$rotation`, `Educ` and `Econ` are the heaviest components of PC 2. `Education` or the pupil/teacher ratio in the public K-12 system, effort index in K-12 and academic options in higher education together with `Economics` or the average household income adjusted for taxes and living costs, income growth, job growth are the heaviest components of PC2. This is not surprising, as receiving a good education and having good economic status (better jobs because they have higher education) will likely explain a "better city". These components also affect other components. For example, if you have education, thus more money, you'll likely have better health care, no need for you to do crime and more time for recreation and the arts.
+
+## 3) Construct a biplot containing the first two PCs. Provide a brief interpretation by identifying cities that tend to score high (or low) in the first and/or second PCs.
+
+We construct the a biplot of the first PCs.
+
+```{r}
+biplot(pr.cities, scale = 0, choices = 1:2, cex = 0.3)
+```
+
+Here, we can see that New York has a high PC1 score. On the other hand, Philadelphia and Chicago have low PC2 scores. 
