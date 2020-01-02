@@ -1,0 +1,85 @@
+---
+title: "Exercise 2 - Association Rule Mining"
+author: "Rommel Bartolome"
+date: "March 13, 2019"
+output: pdf_document
+---
+
+## Data Loading and Preliminaries
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+library(arules)
+library(arulesViz)
+library(tidyverse)
+load("marketing_sparse.Rdata") 
+m <- marketing %>% apriori(parameter = 
+                             list(support =0.07, confidence = 0.75, minlen = 2))
+```
+
+## 1) What are the top 5 association rules in terms of lift? In terms of confidence?
+
+In terms of lift, we check the top 10 first:
+```{r}
+inspect(sort(m, by = 'lift')[1:10])
+```
+
+Checking the data, it appears that dual.1 and marital.5 are the same. If you answer dual.1 as YES, you should answer marital.5 as YES too, and vice versa. This is also the case of the difference in the LHS and RHS. Thus, we remove identical rules. The top 5 association rules in terms of lift are:
+
+1. Being aged 14-17 AND being in Grades 9-11
+2. Being single, aged 14-17 and living with parents/family AND having a personal income of less than $10,000
+3. Being aged 14-17 and living with parents/family AND having a personal income of less than $10,000
+4. Being single and aged 14-17 AND having a personal income of less than $10,000
+5. Having a personal income of less than $10,000, being single and aged 14-17, AND living with parents/family
+
+In terms of confidence, we do the same. However, since we are talking about confidence we should be wary of the direction of the LHS and RHS:
+
+```{r}
+inspect(sort(m, by = 'confidence')[1:5]) 
+```
+
+One may also do the analysis made above, removing the possible duplicates.
+
+## 2) What makes houseowners different from renters?
+
+We first check the difference of homeowners from renters based on lift:
+
+```{r}
+homeowners_bylift <- m %>% subset(rhs %in% "hh_stat.1") %>% 
+  sort(by="lift", decreasing = F)
+renters_bylift <- m %>% subset(rhs %in% "hh_stat.2") %>% 
+  sort(by="lift", decreasing = F)
+inspect(homeowners_bylift[1:5])
+inspect(renters_bylift[1:5])
+```
+
+Here, we see that if you are a single male, living in the bay area for at least 5 years, you are likely a homeowner. If you are single and aged 25-34, you are likely a renter.
+
+## 3) Provide 3 association rules that you deem to be actionable. Briefly explain the insights that you have obtained from them.
+
+1. We check income:
+
+```{r}
+income <- m %>% subset(rhs %pin% "income") %>% 
+  sort(by="confidence", decreasing = F)
+inspect(income[1:1])
+```
+
+Here, we see than if you are young (aged 14-17), you are likely to have an income of less than $10,000.
+
+2. We check sex:
+
+```{r}
+sex <- m %>% subset(rhs %pin% "sex") %>% sort(by="confidence", decreasing = F)
+inspect(sex[1:1])
+```
+
+Here we see that if you are homemaker, you are likely a female.
+
+3. We check occupation:
+
+```{r}
+occup <- m %>% subset(rhs %pin% "occup") %>% sort(by="confidence", decreasing = F)
+inspect(occup[1:1])
+```
+
+Here we see that if you are aged 14-17, single, living with your parents/family and speaks english, you are likely a student (HS/College).
