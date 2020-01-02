@@ -1,0 +1,367 @@
+---
+title: "Stat 218 - Analytics Project IV"
+author: "Inigo Benavides and Rommel Bartolome"
+date: "April 12, 2019"
+abstract: "In this project, we utilized three techniques for analysis involving two datasets. First, Principal Components Analysis was implemented to a dataset consisting of 500 universities in the United States. Here, we found that at up to `7` components, we are able to achieve around 75% of the cumulative proportion of the variance. Second, we used cluster analysis on the same dataset, using both hierarchical and non-hierarchical methods. We found that the non-hierarchical k-means clustering was the best, producing `8` clusters. Lastly, we used associate rule mining to a dataset containing transactions in the form of financial products. The most interesting association we found is that if you have savings in a bank, you are likely to have a philhealth too. This is actionable by the government wherein they can bundle a savings account as one of our mandatory benefits."
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Introduction
+
+For our fourth analytics project, we will be utilizing three techniques using two datasets. The three techniques are Principal Components Analysis (PCA), Clustering, and Associate Rule Mining (ARM). 
+
+The first dataset consists of 500 universities in the United States. The variables are:
+
+- ADM_RATE: admission rate defined as number of admitted undergraduates divided by the number of undergraduates who applied
+- SATVR25: 25th percentile of the scores in the reading section of the SAT (Scholastic Assessment Test)
+- SATVR75: 75th percentile of the scores in the reading section of the SAT (Scholastic Assessment Test)
+- SATMT25: 25th percentile of the scores in the math section of the SAT (Scholastic Assessment Test)
+- SATMT75: 75th percentile of the scores in the math section of the SAT (Scholastic Assessment Test)
+- SATWR25: 25th percentile of the scores in the writing section of the SAT (Scholastic Assessment Test)
+- SATWR75: 75th percentile of the scores in the writing section of the SAT (Scholastic Assessment Test)
+- PCIP11: percent of degrees awarded in category 11* programs (Computer Science)
+- PCIP13: percent of degrees awarded in category 13 programs (Education)
+- PCIP24: percent of degrees awarded in category 24 programs (Liberal Arts)
+- PCIP38: percent of degrees awarded in category 38 programs (Philosophy)
+- PCIP50: percent of degrees awarded in category 50 programs (Visual and Performing Arts)
+- PCIP51: percent of degrees awarded in category 51 programs (Health)
+- PCIP52: percent of degrees awarded in category 52 programs (Business)
+- UGDS: number of degree-seeking undergraduates enrolled
+- TUITFTE: net tuition revenue per full-time equivalent student (in USD)
+- PFTFAC: proportion of full-time faculty
+- RET_FT4: proportion of full-time students who return to the institution after the first year
+- PCTFLOAN: proportion of students who received loans
+- UG25abv: proportion of students who are ages 25 to 64
+- RPY_5YR_RT: proportion of students who are making progress (have not defaulted) in paying their loans five years after graduation
+
+These variables will be used in PCA to extract principal components that can explain a substantial amount of variation in the data. We will aim for the cumulative proportion of variance explained to be at least 75%. Aside from PCA, the same dataset will be used to form clusters and we will be using both hierarchical and non-hierarchical methods in order to find the best balanced clusters.
+
+The second data dataset  consists of 350 "transactions" in the form of financial products that a household currently has. A household is considered to have the financial product if the respondent has it personally or jointly with other household members. The products are `Savings account in bank, Savings account in other institution, Current account, Microfinance loan, Business loan, Mortgage loan, Life insurance, Health insurance, Philhealth, Non-life insurance, Mutual funds, Stock market shares, SSS/GSIS pension, Pension fund, Credit card, Prepaid/debit card,` and ` Business franchise`.
+
+For this dataset, we will form association rules to see which products tend to be commonly availed by households.
+
+# Data Loading and Cleaning
+
+We load all the libraries we will be using in this project. In addition, similar to our previous projects, we will also clean our data and set our seed for reproducibility. 
+
+For the first dataset, we will rename some columns to match the titles above. Fortunately, for the second dataset, we won't need to clean it as it can be already easily analyzed in its given form.
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(DT)
+library(GGally)
+library(cluster)
+library(arules)
+library(arulesViz)
+library(png)
+seed <- 99
+data1 <- read_csv("data1_BaBe.csv") %>% 
+  rename(PCIP_COMPSCI=PCIP11,
+         PCIP_EDUC=PCIP13,
+         PCIP_LIBERAL_ARTS=PCIP24,
+         PCIP_PHILO=PCIP38,
+         PCIP_VIS_PERF_ARTS=PCIP50,
+         PCIP_HEALTH=PCIP51,
+         PCIP_BUSINESS=PCIP52)
+```
+
+# Principal Components Analysis
+
+Below we run an initial PCA fit on the full data set and display the summary. We find that up to 7 components, we achieve around 75% of the cumulative proportion of variance explained:
+
+```{r}
+data1_pca <- prcomp(data1, scale = TRUE, center = TRUE)
+data1_pca %>% summary
+```
+
+## Selection of PCs to be included
+
+We plot cumulative variance of proportion explained:
+
+```{r}
+data.frame(
+  cev=summary(data1_pca)$importance[3,]
+  ) %>% ggplot(aes(x=1:21, y=cev)) +
+  geom_line() +
+  theme_minimal() +
+  labs(title="Cumulative explained variance for Admissions Data") +
+  xlab("Number of Principal Components") +
+  ylab("Proportion of Variance Explained") +
+  geom_hline(aes(yintercept=0.75), color='red', linetype='dashed') +
+  geom_vline(aes(xintercept=7), color='red', linetype='dashed')
+```
+
+Based on the above analysis, we choose to fit a PCA model using 7 components since it accounts for 75% of the variation.
+
+## Description of Final PCs
+
+We display the values of the final PCs:
+
+```{r}
+data1_pca_final <- prcomp(data1, scale = TRUE, center = TRUE, rank=7)
+data1_pca_final_rotations <- summary(data1_pca_final)$rotation
+data1_pca_final_rotations  
+
+### Use this code snippet below in HTML format for easier visualization
+#  %>% formatStyle(
+#    columns=colnames(data1_pca_final_rotations),
+#    color=styleInterval(c(-1, -0.3, 0, 0.3, 1), 
+#     c('red', 'orange', 'white', 'grey','orange', 'red'))
+#    ) 
+```
+
+Based on the above results, we explain each component:
+
+1. PC1: Academic Achievement
+
+The first component has high loadings for features relating to SAT scores, with each around -0.33. We can classify this component as reflecting *academic achievement*.
+
+2. PC2: University Size and Financial Capability
+
+The second component has high loadings for `UGDS` (+), `TUITFTE` (-), `PFTFAC` (+), and `PCTFLOAN` (-), corresponding to the number of undergraduate students enrolled, tuition fee per student, percent of full time faculty, and percent of students with loans, respectively. We can term this component as reflecting *university size and financial capability*. Interestingly, `PCIP_VIS_PERF_ARTS` has high negative loadings, perhaps due to such performing arts schools known for scholarships.
+
+3. PC3: Student Demographics
+
+The third component has high loadings for `PCIP_EDUC` (-), `PCIP_LIBERAL_ARTS` (+), `PFTFAC` (-), and `UG25abv` (+). We can term this component *student demographics*, since the strongest descriptor for this component comes from the proportion of students aged 25 to 64. It seems that universities with older undergraduate students typically have less full time faculty and have more liberal arts graduates.
+
+4. PC4: Science vs. Liberal Arts
+
+The fourth component has high loadings for `ADM_RATE` (+), `PCIP_COMPSCI` (+), `PCIP_LIBERAL_ARTS` (-), `PCIP_PHILO` (-), `PCIP_HEALTH` (+), and `RPY_5YR_RT` (+). We can term this as a sort of *science vs. liberal arts* feature, possibly reflecting the increase in admissions and demand for computer science and medicine degrees over liberal arts and philosophy degrees. Interestingly, the positive inclusion of `RPY_5YR_RT` may indicate that those in science oriented degrees are better able to pay back loans, arguably because the demand for these is higher and have better prospects in industry.
+
+5. PC5: Medicine vs. Business Schools
+
+The fifth component has `PCIP_HEALTH` (-) and `PCIP_BUSINESS` (+). We can term this component as *medicine vs. business schools*.
+
+6. PC6: Other Degree Differences
+
+The sixth component has `PCIP_COMPSCI` (+), `PCIP_PHILO` (-), `PCIP_VIS_PERF_ARTS` (+), `PCIP_BUSINESS` (-), and `UGDS` (+). Here we see a similar variation on the contrasts between universities that are known for certain fields -- in this case, we see computer science and visual performing arts contrasting with philosophy and business oriented schools; the former appear to be more correlated with larger student populations. We feel that this component tells the same stories as `PC4` and `PC5`.
+
+7. PC7: CompSci and Philo
+
+The seventh component only has `PCIP_COMPSCI` (-) and `PCIP_PHILO` (-), though we feel that this is more or less the same story for `PC4`.
+
+Below we attempt to visualize `PC1` and `PC2` as a bi-plot:
+```{r}
+data1_pca_final %>% biplot
+```
+
+To further understand `PC2`, we plot `UGDS` against `TUTFTE`:
+```{r}
+data1 %>% ggplot(aes(x=UGDS, y=TUITFTE)) + geom_point() + geom_smooth() + theme_minimal()
+```
+
+
+Interestingly, if we plot `UGDS` vs. `TUITFTE` to validate PC2, we find that there does seem to be a split between expensive schools with fewer students (likely private universities), and cheaper schools with many students (likely public universities).
+
+
+# Cluster Analysis
+
+## Choosing the Best Clustering Model: K-Means vs Hierarchical Clustering
+
+First, we fit a K-Means clustering model on the data set:
+
+```{r}
+set.seed(seed)
+ks <- 1:50
+ks %>% Map(function(x) {
+  kms <- data1 %>% scale(F, T) 
+  km <- kmeans(kms, x, nstart=20)
+  tot_within_ss <- km$tot.withinss
+}, .) %>% unlist %>%
+  as.data.frame() %>%
+  rename("Total Within-Cluster Sum of Squares"=1) %>% 
+  ggplot(aes(x=ks, y=`Total Within-Cluster Sum of Squares`)) +
+  geom_line() + labs(title="Total Within-Cluster Sum of Squares @ k") + theme_minimal() +
+  scale_x_continuous(breaks=seq(0, 50, 5)) + geom_vline(aes(xintercept=8), color='red') +
+  geom_vline(aes(xintercept=13), color='red')
+
+```
+
+By inspection, it seems that we find an elbow point between k = 8 and k = 13.
+
+We check now the distribution of the cluster members using different cluster numbers:
+
+```{r}
+sd.data <- scale(data1, F, T)
+for (i in 8:13){
+  set.seed(seed)
+  km.out_n <- kmeans(sd.data, i)
+  table(km.out_n$cluster) %>% print()
+}
+```
+
+Checking the distribution, we have an extremely small cluster with only 1 member when k is equal to 9 to 11. As we would want to keep the clusters balanced as possible, we will choose k = 8.
+
+Next, we perform hierarchical clustering with complete, average, and single linkages:
+
+```{r}
+hc_complete <- data1 %>% scale %>% dist %>% hclust('complete')
+hc_average <- data1 %>% scale %>% dist %>% hclust('average')
+hc_single <- data1 %>% scale %>% dist %>% hclust('single')
+
+hc_complete %>% plot(main = 'Complete Linkage', cex = .1)
+```
+
+```{r}
+par(mfrow = c(1,2))
+hc_average %>% plot(main = 'Average Linkage', cex = .1)
+hc_single %>% plot(main = 'Single Linkage', cex = .1)
+```
+
+It is clear that the complete linkage provides the most balanced segment, with the average and the single linkage having extremely one-sided initial clustering. Now, we want to cut the "tree" to a balanced segment. We check again the cluster member distribution using different k:
+
+```{r}
+for (i in 8:13){
+  set.seed(seed)
+  hc.out <- data1 %>% scale %>% dist %>% hclust('complete')
+  hc.clusters <- cutree(hc.out, i)
+  table(hc.clusters) %>% print()
+}
+```
+
+Here, we see that the its even worse than k-means clustering! Most of the members are just in the first two clusters. As such, we would choose k-means clustering with k = 8. We check the silhoutte value of the said clustering:
+
+```{r}
+set.seed(seed)
+final_cluster <- kmeans(sd.data, 8)
+data.dist <- data1 %>% scale %>% dist
+plot(silhouette(final_cluster$cluster, data.dist), col=1:8, border = NA)
+```
+
+Here, we can see that most of the clusters are clustered correctly, except for cluster 2 which has quite a small value, bordering to almost zero. However, the average silhoutte width is 0.10, which is still on the positive side which means the similarity of our objects its own cluster (cohesion) is stronger compared to other clusters (separation).
+
+## Descriptive Analysis of the Formed Clusters
+
+To allow for more flexibility, we exported the values of the clusters in Excel, so we can easily pinpoint visually the differences of the clusters:
+
+```{r}
+pp <- readPNG("clusters2.png")
+plot.new() 
+rasterImage(pp,0,0,1,1)
+```
+
+Here, we can the stark difference of the clusters. The red ones mean they have the lowest mark in that particular variable, green being the highest and yellow being a placeholder to group "average ones". Clusters 1, 2, 3, 6, and 8 appears to be primarily clustered via the scores in the Scholastic Assessment Test. Clusters 4 and 6 on the other hand have distinct high marks on some criteria. Cluster 7 appears to be worst in some areas, but the best in Visual Performance Arts. Cluster 5 appears to be the most "average" one, having high marks on Computer Science.
+
+We describe them in detail and create a persona for each cluster.
+
+1. The Healthcare Professionals Cluster (35 Universities)
+
+This cluster can be characterized by a high-percentage of degrees awarded to health programs. Aside from that, they are usually the students who received loans and are above 25 years old. This is quite logical, as these are likely medical students that needs financing in their studies and given the long time to finish a medical course, are usually older. Surprisingly, they have lower than average SAT scores, which are not intuitive for medical professionals.
+
+2. The Above Average SAT Cluster (76 Universities)
+
+This cluster have above average SAT scores. This is across the board, with the reading, math and writing section, as well as the 25th and 75th percentile of scores.
+
+3. The Lowest SAT Cluster (54 Universities)
+
+Objectively, this is the "worst" cluster of all. This cluster have the lowest SATs. They also have the lowest revenue per full-time equivalent student, the highest drop-out rate (proportion of full-time students who does not return to the institution after the first year) and the highest default rate among all clusters. They are mostly Liberal Arts and Business Schools.
+
+4. The Big Universities Cluster (106 Universities)
+
+This cluster have the highest number of degree-seeking undergraduates enrolled and the highest proportion of full-time faculty. This means that these are likely the big schools where there are lots of students and teachers.
+
+5. The Computer Schools Cluster (12 Universities)
+
+This cluster is characterized by having lots of degrees awarded in computer programs.
+
+6. The Education Cluster (149 Universities)
+
+This cluster is characterized by having lots of degrees awarded in education programs. They also have the best admission rate, which is defined to be the number of admitted undergraduates divided by the number of undergraduates who applied.
+
+7. The Visual & Performance Arts Cluster (11 Universities)
+
+This cluster is characterized by having lots of degrees awarded in visual and performance arts. One distinct characteristic is that they solely focus on their programs, offering very little other programs. They are also in clear contrast with Cluster 4, as they have small student and teacher population.
+
+8. The Elite Cluster (57 Universities)
+
+This cluster are called the "elite" ones as they have the lowest admission rate, yet most of their students have very high SATs. They have the lowest drop-out rate and the lowest default rate. Conversely, most of their students do not have loans. They are also the youngest cluster and universities get the most net tuition revenue per full-time equivalent student. They mostly award Philosophy degrees.
+
+Overall, it appears that the clusters formed were unique enough and is distributed relatively well.
+
+# Association Rule Mining
+
+## Initial inspection
+
+We first check the transactions and the item frequency:
+
+```{r}
+fin <- read.transactions("data2_Babe.csv", format = 'basket', sep = ',')
+itemFrequencyPlot(fin, topN=10, type="absolute", main="Item Frequency")
+```
+
+Here, we can see that most of the household have philhealth, with sss/gsis pension being the second one. We also check the summary of our data:
+
+```{r}
+summary(fin)
+```
+
+Here we see that number of items, density, actual number of items and even the extended items. We shall take note of these when checking finding the rules.
+
+## Rule Mining
+
+We set our support to 0.05 and confidence to 0.75. We now check first based on lift:
+
+```{r message=FALSE, warning=FALSE}
+f <- apriori(fin, parameter = list(supp=0.05, conf=0.75, minlen = 2))
+```
+
+```{r}
+inspect(sort(f, by = 'lift')[1:10])
+```
+
+
+Here we see that most are about philhealth. We also check based on confidence:
+
+```{r}
+inspect(sort(f, by = 'confidence')[1:10])
+```
+
+This is also the case. We try to limit the support to 0.15, as we would want to make rules with strong support:
+
+```{r}
+f_30 <- apriori(fin, parameter = list(supp=0.15, conf=0.75, minlen = 2))
+inspect(sort(f_30, by = 'confidence'))
+```
+
+For the first one, we see that if you have an sss/gsis pension, you are likely to have a philhealth too. However, this is actually usually the case for most working class Filipinos since both are government mandated. The other one tells us that if you have a microfinance loan you likely have a philhealth too. This is likely connected again to a mandated government benefit called PAG-IBIG where you can have a microfinance loan. 
+
+The most interesting rule we saw is that if you have savings in bank, you will likely have a philhealth. Having savings in a bank is not mandated by the government, unlike the components in the first two rules. As such, one actionable insight is having a government mandated savings account for all, bundled with financial products such as sss/gsis pension, philhealth and microfinance loans (PAG-IBIG).
+
+We also tried to check non-Philhealth rules:
+
+```{r message=FALSE, warning=FALSE}
+f_n <- apriori(fin, parameter = list(supp=0.001, conf=0.75, minlen = 2))
+```
+
+```{r}
+not_philhealth <- f_n %>% subset(!rhs %in% "philhealth") %>% 
+  sort(by="confidence", decreasing = F) 
+inspect(sort(not_philhealth, by = 'confidence')[1:5])
+```
+
+Unfortunately, the support is very low. We also check for other possibly interesting rules on microfinance loans:
+
+```{r}
+not_philhealth <- f_n %>% subset(rhs %in% "microfinance loan") %>% 
+  sort(by="confidence", decreasing = F) 
+inspect(sort(not_philhealth, by = 'confidence')[1:5])
+```
+
+Similarly, the support is also extremely low. We also check for bank savings:
+
+```{r}
+not_philhealth <- f_n %>% subset(rhs %in% "savings in bank") %>% sort(by="confidence", decreasing = F) 
+inspect(sort(not_philhealth, by = 'confidence')[1:5])
+```
+
+Here we see that if you have a current account, you will likely have savings in bank. Again, this is quite obvious as for most Filipinos, the savings account is the your "entry" product in a banking institution and the checking account is quite secondary.
+
+Overall, we would recommended having more data with better frequency distribution so we can check for more rules with higher support.
+
+## Conclusions
+
+1. Principal Components Analysis was utilized in analyzing university data. We found that up to 7 components, we are able to achieve around 75% of the cumulative proportion of the variance. 
+2. Cluster analysis was utilized on the same dataset. We found that k-means clustering was the best clustering method, producing 8 clusters. 
+3. Associate rule mining was utilized on a new dataset containing transactions of Filipino financial products. The most interesting association we found is that if you have savings in a bank, you are likely to have a philhealth too. One actionable insight from this is the government bundling a new mandatory benefit in the form of a savings account.
